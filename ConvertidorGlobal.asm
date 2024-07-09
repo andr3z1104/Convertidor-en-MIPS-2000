@@ -35,6 +35,14 @@ li $a1 9
 syscall
 .end_macro 
 
+.macro readString
+	la $a0, cadenaBinario
+	li $a1, 32 
+	li $v0, 8
+	syscall
+	la $t0, cadenaBinario 
+.end_macro
+
 #Mensaje de Error en el primer Menu
 .macro error
 print(mensajeError)
@@ -60,10 +68,15 @@ syscall
 cadenaBinario: .space 33
 cadenaHexadecimal: .space 9
 cadenaH: .space 10
+buffer: .space 33
 pila: .space 7
+DaH: .space 9
 
 
-mensajeMenuPrincipal: .asciiz "Bienvenido al conversor de sistemas númericos -MARM-\nIntroduzca el número del menú asociado a el tipo de sistema númerico con el cual introducira su cadena:\n\n1-Binario complemento a 2\n2-Decimal Empaquetado\n3-Base 10\n4-Octal\n5-Hexadecimal\n\n------------------>"
+
+
+
+mensajeMenuPrincipal: .asciiz "Bienvenido al conversor de sistemas númericos -MARM-\nIntroduzca el número del menú asociado a el tipo de sistema númerico con el cual introducira su cadena:\n\n1-Binario complemento a 2\n2-Decimal Empaquetado\n3-Base 10\n4-Octal\n5-Hexadecimal\n6-Decimal Fraccionario a Binario\n------------------>"
 mensajeInput: .asciiz "\nIntroduzca el número--------> "
 mensajeSistemaConvertir: .asciiz "\nIntroducir el número del menú, al sistema númerico que desea convertir:\n\n1-Binario complemento a 2\n2-Decimal Empaquetado\n3-Base 10\n4-Octal\n5-Hexadecimal\n\n------------------>"
 mensajeOutput:  .asciiz "\nSu número ya convertido es -->"
@@ -87,7 +100,7 @@ beq $t0, 2, decimalEmpaquetado
 beq $t0, 3, base10
 beq $t0, 4, Octal
 beq $t0, 5, Hexadecimal
-beq $t0, 6, decimalFraccionarioaBinario
+beq $t0, 6, decimalFraccionarioBinario
 
 #Si el input no es igual al del Menu, lanza error
 error
@@ -321,7 +334,154 @@ Hexadecimal:
 
 
 #Decimal Fraccionario a Binario
-decimalFraccionarioaBinario:
+decimalFraccionarioBinario:
+print(mensajeInput)
+	
+# Leer cadena de la entrada estándar
+	li $v0, 8
+	la $a0, DaH
+	li $a1,9
+	syscall
+
+
+	li $t0 0
+    # Inicializar registros para los números antes y después del punto
+    li $t3, 0  # Números antes del punto
+    li $t4, 0  # Números después del punto
+    
+    li $t6 1
+    
+    li $t7 10
+
+    # Banderas para determinar si estamos leyendo la parte entera o fraccionaria
+    li $t5, 1  # 1 si estamos leyendo la parte entera, 0 si estamos leyendo la parte fraccionaria
+
+loop2:
+    # Leer el siguiente carácter de la cadena
+    lbu $t1, DaH($t0)
+   
+    # Si el carácter es nulo (fin de la cadena), salir del bucle
+    beqz $t1, done
+	
+    # Si encontramos un punto, cambiar la bandera
+    beq $t1, '.', change_to_fraction
+
+    # Convertir el carácter ASCII a un valor decimal
+    sub $t1, $t1, 48  # '0' en ASCII es 48
+	
+    # Si estamos leyendo la parte entera
+    beq $t5, 1, read_integer_part
+
+    # Si estamos leyendo la parte fraccionaria
+    j read_fraction_part
+
+
+change_to_fraction:
+    li $t5, 0  # Cambiar la bandera a fraccionaria
+    addiu $t0, $t0, 1  # Avanzar al siguiente carácter
+    j loop2  # Volver al inicio del bucle
+
+read_integer_part:
+    # Desplazar el número almacenado en $t3 a la izquierda por 1 dígito (multiplicar por 10)
+    mul $t3, $t3, 10
+
+    # Añadir el dígito convertido al número almacenado en $t3
+    add $t3, $t3, $t1
+
+    # Avanzar al siguiente carácter
+    addi $t0, $t0, 1
+    j loop2
+
+read_fraction_part:
+
+	add $t4, $t4, $t1
+	mul $t4, $t4, $t7
+	mul $t6, $t6, 10
+	addi $t0, $t0, 1
+	
+    	j loop2
+
+done:
+    # Imprimir la parte entera (para verificación)
+   # move $a0, $t3
+    #li $v0, 1
+    #syscall
+
+    # Imprimir un espacio
+    #li $a0, ','
+    #li $v0, 11
+    #syscall
+
+    # Imprimir la parte fraccionaria (para verificación)
+    #move $a0, $t4
+    #li $v0, 1
+    #syscall
+
+	b loopT3	
+	
+loopT3:
+	
+	li $t1 23
+	
+	li $t6 0
+	
+	imprimirT3:
+	
+	beq $t1, $t6, loopT4
+	
+	# Obtener el bit más significativo
+   	 srl $t2, $t3, 23
+    	andi $t2, $t2, 1
+
+    	# Imprimir el bit
+    	addi $a0, $t2, 48  # Convertir bit a carácter ASCII ('0' o '1')
+    	li $v0, 11
+    	syscall
+
+    	# Desplazar el número a la izquierda para el siguiente bit
+    	sll $t3, $t3, 1
+
+    	# Incrementar el contador
+    	addi $t6, $t6, 1
+
+    	# Volver al inicio del bucle
+   	 j imprimirT3
+	
+loopT4:
+
+#Imprimir un espacio
+    li $a0, ','
+    li $v0, 11
+    syscall
+    
+    	li $t1 7
+	
+	li $t6 0
+	
+	imprimirT4:
+	
+	beq $t1, $t6, end
+	
+	# Obtener el bit más significativo
+   	 srl $t2, $t4, 7
+    	andi $t2, $t2, 1
+
+    	# Imprimir el bit
+    	addi $a0, $t2, 48  # Convertir bit a carácter ASCII ('0' o '1')
+    	li $v0, 11
+    	syscall
+
+    	# Desplazar el número a la izquierda para el siguiente bit
+    	sll $t4, $t4, 1
+
+    	# Incrementar el contador
+    	addi $t6, $t6, 1
+
+    	# Volver al inicio del bucle
+   	 j imprimirT4
+    
+ end:
+ exit
 
 		
 ####################################
